@@ -3,16 +3,21 @@ package com.chimbs;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.os.Bundle;
+import android.util.Log;
 
 import com.badlogic.gdx.backends.android.AndroidApplication;
 import com.badlogic.gdx.backends.android.AndroidApplicationConfiguration;
 import com.chimbs.MyGdxGame;
 import com.sh.jplatformer.JPlatformerGame;
+import com.sh.jplatformer.resources.ConstantRoot;
+import com.sh.jplatformer.resources.Resources;
 import com.sh.jplatformer.ui.stages.MainMenuStage;
 import com.sh.jplatformer.util.FileUtils;
 
 import java.io.File;
 import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,20 +35,17 @@ public class AndroidLauncher extends AndroidApplication {
 
             assetManager.open("Adventurous.worldfile");
 
-getResources();
-            File resources = new File(getFilesDir(), "resources");
-            resources.mkdir();
-            File adventurous = new File(resources, "Adventurous.worldfile");
-            adventurous.createNewFile();
-            File river = new File(resources, "river.worldfile");
-            river.createNewFile();
-            for(String asset : getAssets().list("")){
-                writeBytesToFile(assetManager.open(asset), new File(resources,asset));
-            }
 
-            writeBytesToFile(assetManager.open("Adventurous.worldfile"), adventurous);
-            writeBytesToFile(assetManager.open("Adventurous.worldfile"), river);
-            MainMenuStage.rootDir = resources;
+            File root = getFilesDir();
+
+            File resources = new File(root, "resources");
+            resources.mkdir();
+            createFileSystem(assetManager,(resources), "");
+            MainMenuStage.rootDir = new File(resources,"worlds");
+            ConstantRoot.ROOT = "";
+            ConstantRoot.LANGUAGE_ROOT = root.getAbsolutePath();
+
+
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -51,6 +53,7 @@ getResources();
 
         initialize(platformerGame, config);
     }
+
 
     public static void writeBytesToFile(InputStream is, File file) throws IOException {
         FileOutputStream fos = null;
@@ -64,9 +67,38 @@ getResources();
         } catch (Exception ex) {
             ex.printStackTrace();
         } finally {
+            fos.flush();
             if (fos != null) {
                 fos.close();
             }
         }
     }
+
+    private void createFileSystem(AssetManager assetManager, File parent, String assetParent)  {
+        try {
+            for (String asset : assetManager.list(assetParent.replaceFirst("/",""))) {
+                if (asset.contains(".")) {
+                    File file = new File(parent, asset);
+                    file.createNewFile();
+                    Log.i("creating", "creating: " + file.getAbsolutePath());
+                    if(assetParent.isEmpty())
+                    writeBytesToFile(assetManager.open(asset), file);
+                    else{
+                        writeBytesToFile(assetManager.open(assetParent.substring(1) + "/" + asset),file);
+                    }
+                } else if (!asset.isEmpty() || !asset.equals("")) {
+                    File file = new File(parent, asset);
+                    file.mkdir();
+                    Log.i("creating", "creating: " + file.getAbsolutePath());
+                    createFileSystem(assetManager, file, assetParent + "/" + asset);
+                }
+
+            }
+        }
+        catch (Exception e ){
+            e.printStackTrace();
+        }
+    }
+
+
 }
